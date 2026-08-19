@@ -1,1 +1,66 @@
 learning the FD.
+
+below code is to implement a custom cat utility in Linux C using basic system calls open, close, read, write.
+
+I compiled and made a executable with with GCC
+
+
+#include <unistd.h>
+#include <fcntl.h>
+
+#define BUFFER_SIZE 4096
+
+// Helper function to write messages to standard error
+void print_error(const char *msg, int length) {
+    write(STDERR_FILENO, msg, length);
+}
+
+// Core function to read from an open file descriptor and write to standard output
+void copy_stream(int src_fd, const char *filename) {
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read;
+    ssize_t bytes_written;
+    ssize_t total_written;
+
+    while ((bytes_read = read(src_fd, buffer, BUFFER_SIZE)) > 0) {
+        total_written = 0;
+        
+        // Handle partial writes (ensure the entire buffer is written out)
+        while (total_written < bytes_read) {
+            bytes_written = write(STDOUT_FILENO, buffer + total_written, bytes_read - total_written);
+            
+            if (bytes_written < 0) {
+                print_error("Error: Write failed\n", 21);
+                return;
+            }
+            total_written += bytes_written;
+        }
+    }
+
+    if (bytes_read < 0) {
+        print_error("Error: Failed to read file\n", 27);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    // If no arguments are passed, read from standard input (behave like standard cat)
+    if (argc == 1) {
+        copy_stream(STDIN_FILENO, "stdin");
+        return 0;
+    }
+
+    // Loop through all file arguments provided
+    for (int i = 1; i < argc; i++) {
+        int fd = open(argv[i], O_RDONLY);
+        
+        if (fd < 0) {
+            print_error("Error: Cannot open file\n", 24);
+            continue; // Move to the next file if one fails
+        }
+
+        copy_stream(fd, argv[i]);
+        close(fd);
+    }
+
+    return 0;
+}
